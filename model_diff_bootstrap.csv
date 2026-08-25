@@ -1,0 +1,4 @@
+comparison,mean,lo,hi,significant
+FlowMatching - Diffusion,-1.00899003965122,-1.08030550098602,-0.941496982253085,TRUE
+StochasticInterpolants - Diffusion,-0.781945705290172,-0.850441913919695,-0.71689862465446,TRUE
+FlowMatching - StochasticInterpolants,-0.227044334361043,-0.265846664326158,-0.188411835131984,TRUE
