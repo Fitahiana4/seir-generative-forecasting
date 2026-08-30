@@ -1,18 +1,6 @@
 # Bridging stochastic compartmental and generative models for epidemic
 # scenario forecasting.
-#
-# Trains three generative families on trajectories from a stage-structured SEIR
-# continuous-time Markov chain, then evaluates them as emulators and as
-# conditional forecasters.
-#
-# Outputs, all written to OUT_DIR:
-#   fidelity.csv                 emulation metrics by model and population decade
-#   forecasting_raw.csv          per-outbreak forecasting scores on held-out data
-#   forecasting_summary.csv      the same, averaged
-#   model_diff_bootstrap.csv     paired bootstrap of the energy-score differences
-#   realdata_rho_sweep.csv       the two historical outbreaks
-#   distribution_shift_check.csv how far the real outbreaks sit outside the pool
-#   figures/                     the four manuscript figures
+
 
 required <- c("dplyr", "tibble", "tidyr", "data.table", "progress", "ggplot2",
               "torch", "outbreaks", "lhs", "surveillance")
@@ -38,7 +26,7 @@ FIG_DIR <- file.path(OUT_DIR, "figures")
 for (d in c(OUT_DIR, FIG_DIR)) dir.create(d, showWarnings = FALSE, recursive = TRUE)
 
 
-# Simulation grid and pool ------------------------------------------------
+# Simulation grid and pool
 
 T_MAX <- 125; DT <- 1
 L <- as.integer(T_MAX / DT) + 1L
@@ -75,7 +63,7 @@ RHO_RANGE <- c(0.05, 1.00)
 N_HELDOUT <- 1000L
 
 
-# Model and training ------------------------------------------------------
+# Model and training
 
 BETA_MIN <- 0.1; BETA_MAX <- 10.0
 N_DIFF <- 1000L; N_FLOW <- 50L; N_SI <- 50L
@@ -85,7 +73,7 @@ EMA_DECAY <- 0.999; MIN_SNR_GAMMA <- 5.0; WEIGHT_DECAY <- 1e-4; WARMUP_EPOCHS <-
 SI_SIGMA_MAX <- 0.5
 
 
-# Evaluation --------------------------------------------------------------
+# Evaluation
 
 N_GEN_FIDELITY <- 10000L
 EVAL_ENS       <- 60L
@@ -102,7 +90,7 @@ RHO_SWEEP     <- c(0.2, 0.5, 1.0)
 DISEASES      <- c("flu1978", "hagelloch")
 
 
-# Utilities ---------------------------------------------------------------
+# Utilities
 
 .logt   <- function(x) log1p(pmax(x, 0))
 .Nstrat <- function(N) ifelse(N < 1000, "small", ifelse(N < 10000, "medium", "large"))
@@ -154,7 +142,7 @@ DISEASES      <- c("flu1978", "hagelloch")
 }
 
 
-# SEIR simulator ----------------------------------------------------------
+# SEIR simulator
 
 qint  <- function(u, lo, hi) if (lo == hi) rep(as.integer(lo), length(u)) else pmin(hi, lo + floor(u * (hi - lo + 1)))
 qcont <- function(u, lo, hi) if (lo == hi) rep(lo, length(u)) else qunif(u, min = lo, max = hi)
@@ -343,7 +331,7 @@ log_N_obs_train <- torch_tensor(log(N_train_values), dtype = torch_float32(), de
 rho_obs_train   <- torch_tensor(.rho_tr, dtype = torch_float32(), device = DEVICE)
 
 
-# Network -----------------------------------------------------------------
+# Network
 
 beta_schedule    <- function(tau) BETA_MIN + tau * (BETA_MAX - BETA_MIN)
 alpha_bar_scalar <- function(tau) exp(-(tau * BETA_MIN + tau^2 * (BETA_MAX - BETA_MIN) / 2))
@@ -525,7 +513,7 @@ stack_signal_mask <- function(x, mask) torch_stack(list(x, mask), dim = 2L)
 }
 
 
-# Training ----------------------------------------------------------------
+# Training
 
 train_diffusion <- function(X, log_N, rho_tensor) {
   n_sims <- dim(X)[1]
@@ -667,7 +655,7 @@ saveRDS(lapply(FITS, `[[`, "losses"), file.path(OUT_DIR, "training_losses.rds"))
 invisible(gc()); if (cuda_is_available()) cuda_empty_cache()
 
 
-# Sampling ----------------------------------------------------------------
+# Sampling
 
 sample_diffusion <- function(fitted, log_N_values, rho_values) {
   model <- fitted$model; model$eval(); n <- length(log_N_values)
@@ -809,7 +797,7 @@ denormalize_by_N <- function(X, N) sweep(X, 1, N, "*")
 }
 
 
-# Metrics -----------------------------------------------------------------
+# Metrics
 
 # Every functional is a function of (trajectory, N) only, so it is computable
 # identically on simulated and generated data.
@@ -1041,7 +1029,7 @@ make_outbreak <- function(traj, label, N_val) {
 .is_minor <- function(I_vec, N_val) (max(I_vec) / max(N_val, 1)) < EXT_PEAK_FRAC
 
 
-# Simulator validation ----------------------------------------------------
+# Simulator validation
 
 cat("\nsimulator checks\n")
 .chk_R0 <- c(1.5, 2.5, 4, 8); .chk_n <- 1L
@@ -1054,7 +1042,7 @@ cat(sprintf("  mean infectious period from the renewal identity: %.3f d\n",
                  na.rm = TRUE)))
 
 
-# Emulation fidelity ------------------------------------------------------
+# Emulation fidelity
 
 cat("\nemulation fidelity\n")
 set.seed(1717)
@@ -1105,7 +1093,7 @@ fwrite(FID, file.path(OUT_DIR, "fidelity.csv"))
 FID_CTX <- list(I_ref = I_ref, N = N_fid, strat = strat_fid, gen = GEN_FID)
 
 
-# Conditional forecasting on held-out simulations -------------------------
+# Conditional forecasting on held-out simulations
 
 cat("\nforecasting on held-out simulations\n")
 set.seed(4242)
@@ -1156,7 +1144,7 @@ br <- do.call(rbind, lapply(prs, function(p) {
 fwrite(br, file.path(OUT_DIR, "model_diff_bootstrap.csv"))
 
 
-# Historical outbreaks ----------------------------------------------------
+# Historical outbreaks
 
 load_flu1978 <- function() {
   d <- outbreaks::influenza_england_1978_school
@@ -1221,7 +1209,7 @@ run_real_sweep <- function(diseases = DISEASES) {
 SWEEP <- run_real_sweep()
 
 
-# Figures -----------------------------------------------------------------
+# Figures
 
 # Axis labels only: no title, no subtitle, no legend title.
 .cap <- function(x) { x <- as.character(x); paste0(toupper(substring(x, 1, 1)), substring(x, 2)) }
@@ -1351,7 +1339,7 @@ fig4_one(load_flu1978,   "fig_04a_flu1978")
 fig4_one(load_hagelloch, "fig_04b_hagelloch")
 
 
-# Distribution shift ------------------------------------------------------
+# Distribution shift
 
 # How far the two historical outbreaks sit outside the training pool. The peak
 # prevalence needs no methodological choice; the growth rate does, so the fitting
